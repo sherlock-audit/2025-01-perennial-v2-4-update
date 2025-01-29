@@ -64,6 +64,8 @@ The base of this audit should be this commit: https://github.com/equilibria-xyz/
 
 This release makes (relatively) minor changes intended to improve user experience and reduce transaction fees.
 
+Perennial Intents: https://docs.google.com/document/d/1byG6wleAmR4LAK0x4qFNfmOaXk0Vef__tyYUxF4a4bE/edit?usp=drivesdk
+
 
 # Audit scope
 

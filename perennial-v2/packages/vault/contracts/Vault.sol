@@ -50,9 +50,6 @@ abstract contract Vault is IVault, Instance {
     /// @dev Per-id accounting state variables
     mapping(uint256 => CheckpointStorage) private _checkpoints;
 
-    /// @dev DEPRECATED SLOT -- previously the mappings
-    bytes32 private __unused0__;
-
     /// @dev The vault's coordinator address (privileged role that can operate the vault's strategy)
     address public coordinator;
 
@@ -387,7 +384,7 @@ abstract contract Vault is IVault, Instance {
                 _checkpointAtId(context, nextCheckpoint.timestamp)
             );
             context.global.shares = context.global.shares.add(profitShares);
-            _credit(coordinator, profitShares);
+            _credit(context, account, coordinator, profitShares);
             emit MarkUpdated(context.mark, profitShares);
 
             // process position
@@ -419,12 +416,18 @@ abstract contract Vault is IVault, Instance {
 
     /// @notice Processes an out-of-context credit to an account
     /// @dev Used to credit shares accrued through fee mechanics
-    /// @param account The account to credit
+    /// @param context Settlement context
+    /// @param contextAccount The account being settled
+    /// @param receiver The coordinator to credit
     /// @param shares The amount of shares to credit
-    function _credit(address account, UFixed6 shares) internal virtual {
-        Account memory local = _accounts[account].read();
-        local.shares = local.shares.add(shares);
-        _accounts[account].store(local);
+    function _credit(Context memory context, address contextAccount, address receiver, UFixed6 shares) internal virtual {
+        // handle corner case where settling the coordinator's own account
+        if (receiver == contextAccount) context.local.shares = context.local.shares.add(shares);
+        else { // update coordinator profit shares
+            Account memory local = _accounts[receiver].read();
+            local.shares = local.shares.add(shares);
+            _accounts[receiver].store(local);
+        }
     }
 
     /// @notice Manages the internal collateral and position strategy of the vault
@@ -444,6 +447,12 @@ abstract contract Vault is IVault, Instance {
                 _retarget(context.registrations[marketId], targets[marketId], shouldRebalance);
     }
 
+    /// @dev Determines how the vault allocates capital and manages positions
+    /// @param context The context to use
+    /// @param deposit The amount of assets that are being deposited into the vault
+    /// @param withdrawal The amount of assets that need to be withdrawn from the markets into the vault
+    /// @param ineligible The amount of assets that are ineligible for allocation due to pending claims
+    /// @return targets Target allocations for each market; must have single entry for each registered market
     function _strategy(
         Context memory context,
         UFixed6 deposit,
